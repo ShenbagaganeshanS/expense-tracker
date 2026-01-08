@@ -33,7 +33,7 @@ expense_tracker/
 └── style.css
 ## How to Run
 ### 1. Clone Repository
-```bash
+
 git clone <your-repo-url>
 cd expense_tracker
 
