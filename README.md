@@ -16,7 +16,7 @@ A full-stack Expense Tracker application built using **Flask**, **MongoDB**, and
 - Libraries: Pandas, FPDF
 
 ## Project Structure
-expense_tracker/
+'''expense_tracker/
 ├── app.py
 ├── config.py
 ├── requirements.txt
@@ -30,7 +30,7 @@ expense_tracker/
 ├── templates/
 │ └── index.html
 └── static/
-└── style.css
+└── style.css'''
 
 ## How to Run
 ### 1. Clone Repository
