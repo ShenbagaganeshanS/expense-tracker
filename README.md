@@ -31,6 +31,7 @@ expense_tracker/
 │ └── index.html
 └── static/
 └── style.css
+
 ## How to Run
 ### 1. Clone Repository
 
