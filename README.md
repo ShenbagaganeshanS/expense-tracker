@@ -17,7 +17,7 @@ A full-stack Expense Tracker application built using **Flask**, **MongoDB**, and
 
 ## Project Structure
 
-
+```
 expense_tracker/
 ├── app.py
 ├── config.py
@@ -33,7 +33,7 @@ expense_tracker/
 │ └── index.html
 └── static/
 └── style.css
-
+```
 
 
 
