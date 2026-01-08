@@ -6,39 +6,64 @@ from fpdf import FPDF
 
 expense_bp = Blueprint("expense_bp", __name__)
 
-
+# -------------------------------
+# CREATE EXPENSE (POST)
+# -------------------------------
 @expense_bp.route("/expenses", methods=["POST"])
 def create_expense():
     data = request.get_json()
     if not data or "expense_id" not in data:
         return jsonify({"error": "expense_id is required"}), 400
+
+    # Normalize ID
+    data["expense_id"] = data["expense_id"].upper()
+
+    # Check if ID already exists
+    existing = expense_collection.find_one({"expense_id": data["expense_id"]})
+    if existing:
+        return jsonify({"error": f"Expense ID '{data['expense_id']}' already exists"}), 409
+
     expense = expense_schema(data)
     expense_collection.insert_one(expense)
-    return jsonify({"message": "Expense added successfully", "expense_id": expense.get("expense_id")}), 201
-
-
+    return jsonify({
+        "message": "Expense added successfully",
+        "expense_id": expense["expense_id"]
+    }), 201
+# -------------------------------
+# READ ALL EXPENSES (GET)
+# -------------------------------
 @expense_bp.route("/expenses", methods=["GET"])
 def get_all_expenses():
     expenses = list(expense_collection.find({}, {"_id": 0}))
     return jsonify(expenses), 200
 
-
+# -------------------------------
+# READ EXPENSE BY ID (GET)
+# -------------------------------
 @expense_bp.route("/expenses/<expense_id>", methods=["GET"])
 def get_expense_by_id(expense_id):
-    expense_id = expense_id.upper()
-    expense = expense_collection.find_one(
-        {"expense_id": expense_id},
-        {"_id": 0}
-    )
+    expense_id = expense_id.upper()  # normalize
+    expense = expense_collection.find_one({"expense_id": expense_id}, {"_id": 0})
     if expense:
         return jsonify(expense), 200
-    return jsonify({"error": "Expense not found"}), 404
+    else:
+        return jsonify({"error": "Expense not found"}), 404
 
-
-
+# -------------------------------
+# UPDATE EXPENSE (PUT)
+# -------------------------------
 @expense_bp.route("/expenses/<expense_id>", methods=["PUT"])
 def update_expense(expense_id):
+    expense_id = expense_id.upper()
     data = request.get_json()
+
+    # Prevent changing to a duplicate expense_id if included in payload
+    if "expense_id" in data:
+        data["expense_id"] = data["expense_id"].upper()
+        existing = expense_collection.find_one({"expense_id": data["expense_id"]})
+        if existing and existing["expense_id"] != expense_id:
+            return jsonify({"error": f"Expense ID '{data['expense_id']}' already exists"}), 409
+
     update_data = {"$set": expense_schema(data)}
     result = expense_collection.update_one({"expense_id": expense_id}, update_data)
     if result.matched_count:
@@ -46,22 +71,29 @@ def update_expense(expense_id):
     else:
         return jsonify({"error": "Expense not found"}), 404
 
-
+# -------------------------------
+# DELETE EXPENSE (DELETE)
+# -------------------------------
 @expense_bp.route("/expenses/<expense_id>", methods=["DELETE"])
 def delete_expense(expense_id):
+    expense_id = expense_id.upper()
     result = expense_collection.delete_one({"expense_id": expense_id})
     if result.deleted_count:
         return jsonify({"message": "Expense deleted successfully"}), 200
     else:
         return jsonify({"error": "Expense not found"}), 404
 
-
+# -------------------------------
+# DEBUG: view all data in terminal
+# -------------------------------
 @expense_bp.route("/debug_expenses", methods=["GET"])
 def debug_expenses():
-    expenses = list(expense_collection.find({}))
+    expenses = list(expense_collection.find({}, {"_id": 0}))
     return jsonify(expenses), 200
 
-
+# -------------------------------
+# SUMMARY REPORT BY CATEGORY
+# -------------------------------
 @expense_bp.route("/expenses/summary", methods=["GET"])
 def summary_report():
     expenses = list(expense_collection.find({}, {"_id": 0}))
@@ -91,4 +123,7 @@ def summary_report():
         pdf.output(pdf_file)
         return send_file(pdf_file, as_attachment=True)
 
-    return jsonify({"message": "Summary report generated", "summary": summary.to_dict(orient="records")}), 200
+    return jsonify({
+        "message": "Summary report generated",
+        "summary": summary.to_dict(orient="records")
+    }), 200

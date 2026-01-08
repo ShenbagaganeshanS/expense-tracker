@@ -54,6 +54,8 @@ const form = document.getElementById('expenseForm');
 const tableBody = document.querySelector('#expenseTable tbody');
 const clearBtn = document.getElementById('clearBtn');
 
+let expensesTableData = [];
+
 // Load expenses on page load
 window.onload = fetchExpenses;
 
@@ -63,6 +65,7 @@ function fetchExpenses() {
     fetch('/expenses')
         .then(res => res.json())
         .then(data => {
+            expensesTableData = data; // store current table data
             data.forEach(exp => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -86,10 +89,18 @@ function fetchExpenses() {
         });
 }
 
-// Add or update expense
-form.addEventListener('submit', (e) => {
+// Add new expense
+function addExpenseListener(e) {
     e.preventDefault();
-    const expense_id = document.getElementById('expense_id').value.trim();
+    const expense_id = document.getElementById('expense_id').value.trim().toUpperCase();
+
+    // Check duplicate
+    const exists = expensesTableData.some(row => row.expense_id.toUpperCase() === expense_id);
+    if(exists) {
+        alert(`Expense ID '${expense_id}' already exists!`);
+        return;
+    }
+
     const data = {
         expense_id,
         date: document.getElementById('date').value,
@@ -103,25 +114,25 @@ form.addEventListener('submit', (e) => {
         created_by: document.getElementById('created_by').value
     };
 
-    // Check if expense exists -> PUT else POST
-    fetch(`/expenses/${expense_id}`, {
-        method: 'PUT',
+    fetch('/expenses', {
+        method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
-    }).then(res => {
-        if(res.status === 404) {
-            // Create new
-            fetch('/expenses', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(fetchExpenses);
+    })
+    .then(res => res.json())
+    .then(res => {
+        if(res.error) {
+            alert(res.error);
         } else {
+            alert(res.message);
+            form.reset();
             fetchExpenses();
         }
-        form.reset();
     });
-});
+}
+
+// Attach initial listener for adding
+form.addEventListener('submit', addExpenseListener);
 
 // Edit expense
 function editExpense(id) {
@@ -138,7 +149,48 @@ function editExpense(id) {
             document.getElementById('location').value = exp.location;
             document.getElementById('notes').value = exp.notes;
             document.getElementById('created_by').value = exp.created_by;
+
+            // Change form submit to update
+            form.removeEventListener('submit', addExpenseListener);
+            form.addEventListener('submit', function updateListener(e) {
+                e.preventDefault();
+                updateExpense(id);
+                form.removeEventListener('submit', updateListener);
+                form.addEventListener('submit', addExpenseListener);
+            });
         });
+}
+
+// Update expense
+function updateExpense(id) {
+    const data = {
+        expense_id: document.getElementById('expense_id').value.trim().toUpperCase(),
+        date: document.getElementById('date').value,
+        category: document.getElementById('category').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        description: document.getElementById('description').value,
+        payment_mode: document.getElementById('payment_mode').value,
+        merchant_name: document.getElementById('merchant_name').value,
+        location: document.getElementById('location').value,
+        notes: document.getElementById('notes').value,
+        created_by: document.getElementById('created_by').value
+    };
+
+    fetch(`/expenses/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(res => {
+        if(res.error) {
+            alert(res.error);
+        } else {
+            alert(res.message);
+            form.reset();
+            fetchExpenses();
+        }
+    });
 }
 
 // Delete expense
