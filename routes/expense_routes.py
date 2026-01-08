@@ -25,11 +25,15 @@ def get_all_expenses():
 
 @expense_bp.route("/expenses/<expense_id>", methods=["GET"])
 def get_expense_by_id(expense_id):
-    expense = expense_collection.find_one({"expense_id": expense_id}, {"_id": 0})
+    expense_id = expense_id.upper()
+    expense = expense_collection.find_one(
+        {"expense_id": expense_id},
+        {"_id": 0}
+    )
     if expense:
         return jsonify(expense), 200
-    else:
-        return jsonify({"error": "Expense not found"}), 404
+    return jsonify({"error": "Expense not found"}), 404
+
 
 
 @expense_bp.route("/expenses/<expense_id>", methods=["PUT"])

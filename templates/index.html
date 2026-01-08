@@ -2,92 +2,155 @@
 <html>
 <head>
     <title>Expense Tracker</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
-<div class="container">
     <h1>Expense Tracker</h1>
 
-    <h2>Add / Update Expense</h2>
-    <form id="expenseForm">
-        <input type="text" name="expense_id" placeholder="Expense ID" required>
-        <input type="date" name="date" required>
-        <input type="text" name="category" placeholder="Category" required>
-        <input type="number" name="amount" placeholder="Amount" required>
-        <input type="text" name="description" placeholder="Description">
-        <input type="text" name="payment_mode" placeholder="Payment Mode">
-        <input type="text" name="merchant_name" placeholder="Merchant Name">
-        <input type="text" name="location" placeholder="Location">
-        <input type="text" name="notes" placeholder="Notes">
-        <input type="text" name="created_by" placeholder="Created By">
-        <button type="submit">Save Expense</button>
-    </form>
+    <div class="container">
+        <div class="form-container">
+            <h2>Add / Update Expense</h2>
+            <form id="expenseForm">
+                <input type="text" id="expense_id" placeholder="Expense ID" required><br>
+                <input type="date" id="date" required><br>
+                <input type="text" id="category" placeholder="Category" required><br>
+                <input type="number" id="amount" placeholder="Amount" required><br>
+                <input type="text" id="description" placeholder="Description"><br>
+                <input type="text" id="payment_mode" placeholder="Payment Mode"><br>
+                <input type="text" id="merchant_name" placeholder="Merchant Name"><br>
+                <input type="text" id="location" placeholder="Location"><br>
+                <input type="text" id="notes" placeholder="Notes"><br>
+                <input type="text" id="created_by" placeholder="Created By"><br>
+                <button type="submit">Save Expense</button>
+                <button type="button" id="clearBtn">Clear</button>
+            </form>
+        </div>
 
-    <h2>All Expenses</h2>
-    <ul id="expensesList"></ul>
-
-    <div class="summary-buttons">
-        <button onclick="downloadSummary('excel')">Download Excel</button>
-        <button onclick="downloadSummary('pdf')">Download PDF</button>
+        <div class="table-container">
+            <h2>Expenses List</h2>
+            <table border="1" id="expenseTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Description</th>
+                        <th>Payment Mode</th>
+                        <th>Merchant</th>
+                        <th>Location</th>
+                        <th>Notes</th>
+                        <th>Created By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-</div>
 
 <script>
-const form = document.getElementById("expenseForm");
+const form = document.getElementById('expenseForm');
+const tableBody = document.querySelector('#expenseTable tbody');
+const clearBtn = document.getElementById('clearBtn');
 
-form.addEventListener("submit", async (e) => {
+// Load expenses on page load
+window.onload = fetchExpenses;
+
+// Fetch all expenses
+function fetchExpenses() {
+    tableBody.innerHTML = '';
+    fetch('/expenses')
+        .then(res => res.json())
+        .then(data => {
+            data.forEach(exp => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${exp.expense_id || ''}</td>
+                    <td>${exp.date || ''}</td>
+                    <td>${exp.category || ''}</td>
+                    <td>${exp.amount || ''}</td>
+                    <td>${exp.description || ''}</td>
+                    <td>${exp.payment_mode || ''}</td>
+                    <td>${exp.merchant_name || ''}</td>
+                    <td>${exp.location || ''}</td>
+                    <td>${exp.notes || ''}</td>
+                    <td>${exp.created_by || ''}</td>
+                    <td>
+                        <button onclick="editExpense('${exp.expense_id}')">Edit</button>
+                        <button onclick="deleteExpense('${exp.expense_id}')">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        });
+}
+
+// Add or update expense
+form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(form));
+    const expense_id = document.getElementById('expense_id').value.trim();
+    const data = {
+        expense_id,
+        date: document.getElementById('date').value,
+        category: document.getElementById('category').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        description: document.getElementById('description').value,
+        payment_mode: document.getElementById('payment_mode').value,
+        merchant_name: document.getElementById('merchant_name').value,
+        location: document.getElementById('location').value,
+        notes: document.getElementById('notes').value,
+        created_by: document.getElementById('created_by').value
+    };
 
-    const check = await fetch(`/expenses/${data.expense_id}`);
-    const method = check.status === 200 ? "PUT" : "POST";
-
-    const url = method === "PUT" 
-        ? `/expenses/${data.expense_id}` 
-        : "/expenses";
-
-    await fetch(url, {
-        method: method,
-        headers: { "Content-Type": "application/json" },
+    // Check if expense exists -> PUT else POST
+    fetch(`/expenses/${expense_id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
+    }).then(res => {
+        if(res.status === 404) {
+            // Create new
+            fetch('/expenses', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(fetchExpenses);
+        } else {
+            fetchExpenses();
+        }
+        form.reset();
     });
-
-    form.reset();
-    loadExpenses();
 });
 
-async function loadExpenses() {
-    const res = await fetch("/expenses");
-    const expenses = await res.json();
-    const list = document.getElementById("expensesList");
-    list.innerHTML = "";
-
-    expenses.filter(e => e.expense_id).forEach(exp => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-            <span>${exp.expense_id}</span>
-            <span>${exp.category}</span>
-            <span>₹${exp.amount}</span>
-            <span>${exp.date}</span>
-            <button class="delete-btn" onclick="deleteExpense('${exp.expense_id}')">Delete</button>
-        `;
-        list.appendChild(li);
-    });
+// Edit expense
+function editExpense(id) {
+    fetch(`/expenses/${id}`)
+        .then(res => res.json())
+        .then(exp => {
+            document.getElementById('expense_id').value = exp.expense_id;
+            document.getElementById('date').value = exp.date;
+            document.getElementById('category').value = exp.category;
+            document.getElementById('amount').value = exp.amount;
+            document.getElementById('description').value = exp.description;
+            document.getElementById('payment_mode').value = exp.payment_mode;
+            document.getElementById('merchant_name').value = exp.merchant_name;
+            document.getElementById('location').value = exp.location;
+            document.getElementById('notes').value = exp.notes;
+            document.getElementById('created_by').value = exp.created_by;
+        });
 }
 
-async function deleteExpense(id) {
-    if (!confirm("Delete this expense?")) return;
-    await fetch(`/expenses/${id}`, { method: "DELETE" });
-    loadExpenses();
+// Delete expense
+function deleteExpense(id) {
+    if(confirm(`Delete ${id}?`)) {
+        fetch(`/expenses/${id}`, { method: 'DELETE' })
+            .then(fetchExpenses);
+    }
 }
 
-function downloadSummary(format) {
-    window.location.href = `/expenses/summary?format=${format}`;
-}
-
-loadExpenses();
+// Clear form
+clearBtn.addEventListener('click', () => form.reset());
 </script>
-
 </body>
 </html>

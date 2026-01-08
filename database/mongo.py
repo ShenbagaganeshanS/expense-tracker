@@ -7,3 +7,4 @@ db = client[DB_NAME]
 
 # Collection for expenses
 expense_collection = db["expenses"]
+print("MongoDB connected successfully")
