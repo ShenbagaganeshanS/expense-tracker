@@ -38,21 +38,21 @@ git clone <your-repo-url>
 cd expense_tracker
 
 
-2. Create Virtual Environment
+### 2. Create Virtual Environment
 python -m venv venv
 venv\Scripts\activate
 
-3. Install Dependencies
+### 3. Install Dependencies
 pip install -r requirements.txt
 
-4. Start MongoDB
+### 4.Start MongoDB
 mongod
 
-5. Run Application
+### 5.Run Application
 python app.py
 
 
-Open browser:
+### Open browser:
 
 http://127.0.0.1:5000
 
