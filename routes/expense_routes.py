@@ -3,6 +3,9 @@ from database.mongo import expense_collection
 from models.expense_model import expense_schema
 import pandas as pd
 from fpdf import FPDF
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4  
 
 expense_bp = Blueprint("expense_bp", __name__)
 
@@ -94,36 +97,69 @@ def debug_expenses():
 # -------------------------------
 # SUMMARY REPORT BY CATEGORY
 # -------------------------------
-@expense_bp.route("/expenses/summary", methods=["GET"])
-def summary_report():
-    expenses = list(expense_collection.find({}, {"_id": 0}))
+@expense_bp.route('/expenses/summary/pdf', methods=['GET'])
+def expense_summary_by_date_pdf():
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+
+    query = {}
+    if from_date and to_date:
+        query["date"] = {"$gte": from_date, "$lte": to_date}
+
+    expenses = list(expense_collection.find(query, {"_id": 0}))
+
     if not expenses:
-        return jsonify({"message": "No expenses found"}), 404
+        return {"error": "No expenses found"}, 404
 
-    df = pd.DataFrame(expenses)
-    summary = df.groupby("category")["amount"].sum().reset_index()
+    # ---- CATEGORY TOTAL ----
+    category_totals = {}
+    for exp in expenses:
+        category = exp.get("category", "Others")
+        amount = exp.get("amount", 0)
+        category_totals[category] = category_totals.get(category, 0) + amount
 
-    file_format = request.args.get("format", "").lower()
+    # ---- PDF ----
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
 
-    if file_format == "excel":
-        excel_file = "expense_summary.xlsx"
-        summary.to_excel(excel_file, index=False)
-        return send_file(excel_file, as_attachment=True)
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(150, height - 40, "Expense Summary By Category")
 
-    elif file_format == "pdf":
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 10, "Expense Summary by Category", ln=True, align="C")
-        pdf.ln(10)
-        pdf.set_font("Arial", "", 12)
-        for index, row in summary.iterrows():
-            pdf.cell(0, 10, f"{row['category']}: {row['amount']}", ln=True)
-        pdf_file = "expense_summary.pdf"
-        pdf.output(pdf_file)
-        return send_file(pdf_file, as_attachment=True)
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(50, height - 65, f"From: {from_date}   To: {to_date}")
 
-    return jsonify({
-        "message": "Summary report generated",
-        "summary": summary.to_dict(orient="records")
-    }), 200
+    y = height - 100
+
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(60, y, "Category")
+    pdf.drawString(300, y, "Total Amount")
+
+    y -= 20
+    pdf.setFont("Helvetica", 11)
+
+    grand_total = 0
+
+    for category, total in category_totals.items():
+        pdf.drawString(60, y, category)
+        pdf.drawString(300, y, f" Rs. {total}")
+        grand_total += total
+        y -= 18
+
+        if y < 60:
+            pdf.showPage()
+            y = height - 60
+
+    y -= 20
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(60, y, f"Grand Total: Rs. {grand_total}")
+
+    pdf.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="expense_summary_by_category.pdf",
+        mimetype="application/pdf"
+    )
