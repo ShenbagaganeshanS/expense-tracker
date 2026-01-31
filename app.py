@@ -6,7 +6,7 @@ app.register_blueprint(expense_bp)
 
 @app.route("/")
 def home():
-    return render_template("index.html")  # This loads the frontend page
+    return render_template("index.html")  
 
 if __name__ == "__main__":
     try:
