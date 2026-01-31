@@ -9,19 +9,15 @@ from reportlab.lib.pagesizes import A4
 
 expense_bp = Blueprint("expense_bp", __name__)
 
-# -------------------------------
-# CREATE EXPENSE (POST)
-# -------------------------------
+
 @expense_bp.route("/expenses", methods=["POST"])
 def create_expense():
     data = request.get_json()
     if not data or "expense_id" not in data:
         return jsonify({"error": "expense_id is required"}), 400
 
-    # Normalize ID
     data["expense_id"] = data["expense_id"].upper()
 
-    # Check if ID already exists
     existing = expense_collection.find_one({"expense_id": data["expense_id"]})
     if existing:
         return jsonify({"error": f"Expense ID '{data['expense_id']}' already exists"}), 409
@@ -32,35 +28,28 @@ def create_expense():
         "message": "Expense added successfully",
         "expense_id": expense["expense_id"]
     }), 201
-# -------------------------------
-# READ ALL EXPENSES (GET)
-# -------------------------------
+
 @expense_bp.route("/expenses", methods=["GET"])
 def get_all_expenses():
     expenses = list(expense_collection.find({}, {"_id": 0}))
     return jsonify(expenses), 200
 
-# -------------------------------
-# READ EXPENSE BY ID (GET)
-# -------------------------------
+
 @expense_bp.route("/expenses/<expense_id>", methods=["GET"])
 def get_expense_by_id(expense_id):
-    expense_id = expense_id.upper()  # normalize
+    expense_id = expense_id.upper()  
     expense = expense_collection.find_one({"expense_id": expense_id}, {"_id": 0})
     if expense:
         return jsonify(expense), 200
     else:
         return jsonify({"error": "Expense not found"}), 404
 
-# -------------------------------
-# UPDATE EXPENSE (PUT)
-# -------------------------------
+
 @expense_bp.route("/expenses/<expense_id>", methods=["PUT"])
 def update_expense(expense_id):
     expense_id = expense_id.upper()
     data = request.get_json()
 
-    # Prevent changing to a duplicate expense_id if included in payload
     if "expense_id" in data:
         data["expense_id"] = data["expense_id"].upper()
         existing = expense_collection.find_one({"expense_id": data["expense_id"]})
@@ -74,9 +63,7 @@ def update_expense(expense_id):
     else:
         return jsonify({"error": "Expense not found"}), 404
 
-# -------------------------------
-# DELETE EXPENSE (DELETE)
-# -------------------------------
+
 @expense_bp.route("/expenses/<expense_id>", methods=["DELETE"])
 def delete_expense(expense_id):
     expense_id = expense_id.upper()
@@ -86,17 +73,13 @@ def delete_expense(expense_id):
     else:
         return jsonify({"error": "Expense not found"}), 404
 
-# -------------------------------
-# DEBUG: view all data in terminal
-# -------------------------------
+
 @expense_bp.route("/debug_expenses", methods=["GET"])
 def debug_expenses():
     expenses = list(expense_collection.find({}, {"_id": 0}))
     return jsonify(expenses), 200
 
-# -------------------------------
-# SUMMARY REPORT BY CATEGORY
-# -------------------------------
+
 @expense_bp.route('/expenses/summary/pdf', methods=['GET'])
 def expense_summary_by_date_pdf():
     from_date = request.args.get('from_date')
@@ -111,14 +94,12 @@ def expense_summary_by_date_pdf():
     if not expenses:
         return {"error": "No expenses found"}, 404
 
-    # ---- CATEGORY TOTAL ----
     category_totals = {}
     for exp in expenses:
         category = exp.get("category", "Others")
         amount = exp.get("amount", 0)
         category_totals[category] = category_totals.get(category, 0) + amount
 
-    # ---- PDF ----
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
